@@ -178,16 +178,18 @@ def task_1_create_a_canonical_request(
     if 'host' in headers:
         fullhost = headers['host']
     else:
-        fullhost = host + ':' + port if port else host
+        fullhost = f'{host}:{port}' if port else host
 
     # Step 4: Create the canonical headers and signed headers. Header names
     # and value must be trimmed and lowercase, and sorted in ASCII order.
     # Note that there is a trailing \n.
-    canonical_headers = ('host:' + fullhost + '\n' +
-                         'x-amz-date:' + amzdate + '\n')
+    canonical_headers = (
+        (f'host:{fullhost}' + '\n' + 'x-amz-date:') + amzdate
+    ) + '\n'
+
 
     if security_token:
-        canonical_headers += ('x-amz-security-token:' + security_token + '\n')
+        canonical_headers += f'x-amz-security-token:{security_token}' + '\n'
 
     # Step 5: Create the list of signed headers. This lists the headers
     # in the canonical_headers list, delimited with ";" and in alpha order.
@@ -227,10 +229,10 @@ def task_2_create_the_string_to_sign(
     SHA-256 (recommended)
     """
     algorithm = 'AWS4-HMAC-SHA256'
-    credential_scope = (datestamp + '/' +
-                        region + '/' +
-                        service + '/' +
-                        'aws4_request')
+    credential_scope = (
+        (((f'{datestamp}/' + region) + '/') + service) + '/'
+    ) + 'aws4_request'
+
     string_to_sign = (algorithm + '\n' +
                       amzdate + '\n' +
                       credential_scope + '\n' +
@@ -258,11 +260,13 @@ def task_3_calculate_the_signature(
         first create a signing key that is scoped to a specific region and service.  For more
         information about signing keys, see Introduction to Signing Requests.
         """
-        k_date = sign(('AWS4' + key).encode('utf-8'), date_stamp)
+        k_date = sign(f'AWS4{key}'.encode('utf-8'), date_stamp)
         k_region = sign(k_date, region_name)
         k_service = sign(k_region, service_name)
         k_signing = sign(k_service, 'aws4_request')
         return k_signing
+
+        # Create the signing key using the function defined above.
 
     # Create the signing key using the function defined above.
     signing_key = get_signature_key(secret_key, datestamp, region, service)
@@ -290,11 +294,31 @@ def task_4_build_auth_headers_for_the_request(
     """
     # Create authorization header and add to request headers
     authorization_header = (
-        algorithm + ' ' +
-        'Credential=' + access_key + '/' + credential_scope + ', ' +
-        'SignedHeaders=' + signed_headers + ', ' +
-        'Signature=' + signature
-    )
+        (
+            (
+                (
+                    (
+                        (
+                            (
+                                (
+                                    (f'{algorithm} ' + 'Credential=')
+                                    + access_key
+                                )
+                                + '/'
+                            )
+                            + credential_scope
+                        )
+                        + ', '
+                    )
+                    + 'SignedHeaders='
+                )
+                + signed_headers
+            )
+            + ', '
+        )
+        + 'Signature='
+    ) + signature
+
 
     # The request can include any headers, but MUST include "host",
     # "x-amz-date", and (for this scenario) "Authorization". "host" and
@@ -315,9 +339,9 @@ def __normalize_query_string(query):
                        for s in query.split('&')
                        if len(s) > 0)
 
-    normalized = '&'.join('%s=%s' % (p[0], p[1] if len(p) > 1 else '')
-                          for p in sorted(parameter_pairs))
-    return normalized
+    return '&'.join(
+        f"{p[0]}={p[1] if len(p) > 1 else ''}" for p in sorted(parameter_pairs)
+    )
 
 
 def __now():
@@ -329,7 +353,7 @@ def __send_request(uri, data, headers, method, verify, allow_redirects):
     __log(headers)
 
     __log('\nBEGIN REQUEST++++++++++++++++++++++++++++++++++++')
-    __log('Request URL = ' + uri)
+    __log(f'Request URL = {uri}')
 
     response = requests.request(method, uri, headers=headers, data=data, verify=verify, allow_redirects=allow_redirects)
 
@@ -465,7 +489,7 @@ def inner_main(argv):
         del args.security_token
 
     # pylint: disable=deprecated-lambda
-    headers = {k: v for (k, v) in map(lambda s: s.split(": "), args.header)}
+    headers = dict(map(lambda s: s.split(": "), args.header))
     headers = CaseInsensitiveDict(headers)
 
     credentials_path = os.path.expanduser("~") + "/.aws/credentials"
